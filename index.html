@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BUCKSHOT® — Castro PG14</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;700;800;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --red:#ff1010; --black:#0a0a0a; --white:#fff; --paper:#f1ece1; --grey:#8d8d8d;
+  --sans:"Inter Tight","Helvetica Neue",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;background:var(--black)}
+body{font-family:var(--sans);color:var(--white);background:var(--black);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body.locked{overflow:hidden;height:100vh}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+@media (pointer:fine){ body.cursor-on, body.cursor-on a, body.cursor-on button{cursor:none} }
+
+/* ---------- global grain ---------- */
+.grain{position:fixed;inset:-50%;z-index:90;pointer-events:none;opacity:.09;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 1s steps(6) infinite}
+@keyframes grain{0%{transform:translate(0,0)}20%{transform:translate(-4%,3%)}40%{transform:translate(3%,-5%)}60%{transform:translate(-6%,-2%)}80%{transform:translate(5%,4%)}100%{transform:translate(0,0)}}
+.scanlines::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px);mix-blend-mode:multiply}
+
+/* ---------- progress bar ---------- */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:var(--red);z-index:80;box-shadow:0 0 12px var(--red)}
+
+/* ---------- cursor + buckshot ---------- */
+#reticle{position:fixed;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;z-index:200;pointer-events:none;
+  transition:width .18s,height .18s,margin .18s,color .15s;display:none;color:var(--red)}
+#reticle.c-black{color:#000}
+#reticle.c-white{color:#fff}
+#reticle.c-white svg{filter:drop-shadow(0 0 1px rgba(0,0,0,.6))}
+body.cursor-on #reticle{display:block}
+#reticle svg{width:100%;height:100%;overflow:visible}
+#reticle.lock{width:30px;height:30px;margin:-15px 0 0 -15px}
+#reticle.lock circle{stroke-width:2.5}
+#holes{position:absolute;left:0;top:0;width:100%;height:0;z-index:70;pointer-events:none}
+.pellet{position:absolute;width:var(--s);height:var(--s);margin:calc(var(--s)/-2) 0 0 calc(var(--s)/-2);border-radius:50%;
+  background:radial-gradient(circle,#000 0 34%,#1b1b1b 42%,rgba(255,255,255,.55) 50%,rgba(255,255,255,0) 64%);
+  animation:pellet 7s ease-in forwards}
+@keyframes pellet{0%{transform:scale(.2)}6%{transform:scale(1.15)}10%{transform:scale(1)}85%{opacity:1}100%{opacity:0}}
+.flash-ring{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border:2px solid #fff;border-radius:50%;animation:ring .45s ease-out forwards}
+@keyframes ring{to{transform:scale(5);opacity:0}}
+.shake{animation:shake .22s linear}
+@keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-3px,2px)}50%{transform:translate(3px,-2px)}75%{transform:translate(-2px,-1px)}}
+
+/* ---------- LOADER (scope) ---------- */
+#loader{position:fixed;inset:0;z-index:150;background:#000;overflow:hidden}
+#loader .skull-dim{position:absolute;opacity:.16;filter:blur(.6px)}
+#lens{position:absolute;border-radius:50%;overflow:hidden;
+  box-shadow:0 0 0 200vmax rgba(0,0,0,.72),inset 0 0 60px 18px rgba(0,0,0,.95),0 0 0 3px #111,0 0 0 5px rgba(255,16,16,.35)}
+#lens img{position:absolute;max-width:none}
+#lens .lens-tint{position:absolute;inset:0;background:radial-gradient(circle,rgba(255,16,16,0) 55%,rgba(255,16,16,.12));mix-blend-mode:screen}
+#lens svg{position:absolute;inset:0;width:100%;height:100%}
+#lens .rline{stroke:var(--red);stroke-width:1.4}
+#lens.locked .rline{stroke:#fff}
+#lens.locked .rdot{fill:#fff}
+.hud{position:absolute;font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:#d9d9d9;text-transform:uppercase;z-index:3}
+.hud b{color:var(--red);font-weight:600}
+#hud-tl{top:20px;left:22px;line-height:1.6}
+#hud-tr{top:20px;right:22px;text-align:right;line-height:1.6}
+#hud-b{bottom:26px;left:50%;transform:translateX(-50%);text-align:center;width:min(420px,84vw)}
+#hud-b .bar{height:2px;background:#2a2a2a;margin-top:10px;position:relative}
+#hud-b .bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--red);box-shadow:0 0 10px var(--red)}
+#pct{font-size:44px;font-family:var(--sans);font-weight:900;letter-spacing:-.04em;color:#fff;line-height:1}
+#status{margin-top:6px}
+#status.lockedtxt{color:var(--red);animation:blink .18s steps(2) 4}
+@keyframes blink{50%{opacity:0}}
+#skip{position:absolute;right:22px;bottom:22px;z-index:4;font:600 11px var(--mono);letter-spacing:.18em;color:#bbb;background:none;border:1px solid #333;padding:8px 12px}
+#skip:hover{color:#fff;border-color:var(--red)}
+#whiteflash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:5}
+#rip{position:fixed;inset:0;z-index:149;pointer-events:none;display:none}
+#rip .half{position:absolute;inset:0;background:#000;overflow:hidden;will-change:transform}
+#rip .half img{position:absolute;opacity:.85;max-width:none}
+#rip .hole{position:absolute;width:42px;height:42px;margin:-21px 0 0 -21px;border-radius:50%;
+  background:radial-gradient(circle,#000 0 30%,#300 40%,var(--red) 48%,rgba(255,16,16,0) 70%)}
+#rip svg{position:absolute;inset:0;width:100%;height:100%}
+
+/* ---------- HERO ---------- */
+#hero{position:relative;min-height:100vh;background:var(--red);color:var(--black);overflow:hidden;display:flex;flex-direction:column}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 22px;position:relative;z-index:5}
+.tvpg{background:#000;color:#fff;font-weight:900;line-height:.86;padding:6px 7px 5px;font-size:15px;letter-spacing:-.02em;text-align:center;border:2px solid #fff;outline:2px solid #000}
+.tvpg small{display:block;font-size:9px;letter-spacing:.06em;margin-bottom:2px}
+.tvpg span{display:block;font-size:22px}
+nav{display:flex;gap:22px;font-weight:800;font-size:14px;letter-spacing:-.01em}
+nav a{position:relative;padding:2px 0}
+nav a::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:2px;background:#000;transition:right .25s}
+nav a:hover::after{right:0}
+.hero-stage{flex:1;position:relative;display:grid;place-items:center;padding:10px 0 30px}
+.hero-marquee{position:absolute;left:0;right:0;top:50%;transform:translateY(-55%);white-space:nowrap;pointer-events:none;z-index:1}
+.hero-marquee .row{display:inline-block;font-weight:900;font-size:clamp(120px,22vw,340px);letter-spacing:-.065em;line-height:.8;color:#000;animation:marq 26s linear infinite}
+.hero-marquee .row.ghost{color:transparent;-webkit-text-stroke:2px rgba(0,0,0,.55);animation-direction:reverse;animation-duration:34s;display:block}
+@keyframes marq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.cover-wrap{position:relative;z-index:3;perspective:1200px}
+.cover{position:relative;z-index:3;width:min(62vh,78vw);aspect-ratio:1;transform-style:preserve-3d;transition:transform .12s ease-out;
+  box-shadow:0 30px 60px rgba(0,0,0,.45),0 0 0 6px #000}
+.cover img{width:100%;height:100%;object-fit:cover}
+.cover .glare{position:absolute;inset:0;background:radial-gradient(circle at var(--gx,50%) var(--gy,50%),rgba(255,255,255,.28),transparent 45%);mix-blend-mode:soft-light;pointer-events:none}
+.targets{position:absolute;inset:-24%;z-index:2;pointer-events:none}
+.targets ellipse{fill:none;stroke:#000;stroke-width:2.2;stroke-dasharray:1400;stroke-dashoffset:1400}
+.hero-in .targets ellipse{animation:draw 1.6s cubic-bezier(.7,0,.2,1) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.hero-in .cover{animation:slap .7s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes slap{0%{transform:scale(1.5) rotate(-8deg);opacity:0}100%{transform:scale(1) rotate(0);opacity:1}}
+.hero-foot{position:relative;z-index:4;display:flex;justify-content:space-between;align-items:flex-end;padding:0 22px 22px;gap:20px;flex-wrap:wrap}
+.date{font-weight:900;letter-spacing:-.05em;line-height:.85}
+.date .d1{font-size:clamp(40px,7vw,92px);color:#000}
+.date .d2{font-size:clamp(26px,3.6vw,46px);color:#fff;margin-top:2px}
+.countdown{font-family:var(--mono);font-size:13px;letter-spacing:.14em;text-align:right;color:#000}
+.countdown b{display:inline-block;background:#000;color:var(--red);padding:5px 9px;margin-top:6px;font-weight:600}
+.countdown b.live{animation:pulse 1.1s infinite}
+@keyframes pulse{50%{background:#fff;color:#000}}
+.copy{font-size:9px;font-weight:700;letter-spacing:.02em;text-align:center;color:rgba(0,0,0,.75);padding-bottom:12px;position:relative;z-index:4}
+.rise span{display:inline-block;transform:translateY(110%);opacity:0}
+.hero-in .rise span{animation:rise .7s cubic-bezier(.2,.9,.2,1) forwards;animation-delay:calc(.6s + var(--i)*.035s)}
+@keyframes rise{to{transform:none;opacity:1}}
+
+/* ---------- TICKER ---------- */
+.ticker{background:#000;color:#fff;border-top:2px solid #000;overflow:hidden;white-space:nowrap;padding:14px 0;position:relative;z-index:2}
+.ticker .track{display:inline-flex;align-items:center;gap:34px;animation:marq 30s linear infinite;padding-right:34px}
+.ticker .t{font-weight:900;font-size:26px;letter-spacing:-.04em}
+.ticker .t.r{color:var(--red)}
+.ticker .pill{font-weight:900;font-size:15px;border:2.5px solid #fff;border-radius:999px;padding:3px 12px;letter-spacing:-.01em}
+.ticker .x{width:20px;height:20px}
+
+/* ---------- section labels ---------- */
+.label{font-family:var(--mono);font-size:12px;letter-spacing:.2em;text-transform:uppercase}
+.label .n{color:var(--red)}
+.big{font-weight:900;letter-spacing:-.055em;line-height:.85}
+
+/* ---------- TRACKLIST (paper rip) ---------- */
+#tracklist{position:relative;height:430vh;background:#0c0c0c}
+#tracklist .stage{position:sticky;top:0;height:100vh;overflow:hidden;display:grid;grid-template-columns:minmax(220px,1fr) auto minmax(220px,1fr);align-items:center}
+#tracklist .side{padding:0 32px;align-self:stretch;display:flex;flex-direction:column;justify-content:center;gap:18px;position:relative;z-index:5}
+#tracklist .side.r{align-items:flex-end;text-align:right}
+.tl-head .a{font-weight:900;font-size:clamp(34px,4vw,58px);letter-spacing:-.05em;color:var(--red);line-height:.9}
+.tl-head .b{font-weight:900;font-size:clamp(34px,4vw,58px);letter-spacing:-.05em;color:var(--grey);line-height:.9}
+.tl-list{font-family:var(--mono);font-size:12px;letter-spacing:.08em;line-height:2;color:#666}
+.tl-list li{list-style:none;transition:color .2s}
+.tl-list li.on{color:#fff}
+.tl-list li.on::before{content:"✕ ";color:var(--red)}
+.tl-count{font-weight:900;font-size:clamp(48px,6vw,96px);letter-spacing:-.06em;line-height:.8}
+.tl-count small{font-size:.35em;color:var(--grey);letter-spacing:-.02em}
+.hint{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:#888}
+.hint i{display:inline-block;animation:bob 1.2s ease-in-out infinite;font-style:normal;color:var(--red)}
+@keyframes bob{50%{transform:translateY(4px)}}
+#sheet{position:relative;height:min(86vh,calc(92vw*1370/945));aspect-ratio:945/1370}
+#sheet .layer{position:absolute;inset:0}
+#sheet .layer.paper{z-index:1}
+#sheet .layer.ink{z-index:2}
+.pc{position:absolute;will-change:transform}
+.pc .pp{position:absolute;inset:0;background-color:var(--paper);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .40 0 0 0 0 .32 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E")}
+.paper .pc{filter:drop-shadow(0 6px 8px rgba(0,0,0,.55))}
+.ink .pc{cursor:inherit}
+.ink .pc img{position:absolute}
+.tape{position:absolute;height:2.4%;min-height:10px;width:9%;background:rgba(236,226,196,.82);
+  box-shadow:0 1px 2px rgba(0,0,0,.2);transform:translate(-50%,-50%) rotate(var(--tr)) scale(0);transition:transform .35s cubic-bezier(.2,1.8,.4,1);z-index:3;pointer-events:none}
+.joined .tape{transform:translate(-50%,-50%) rotate(var(--tr)) scale(1)}
+#tip{position:fixed;z-index:120;pointer-events:none;font:600 12px var(--mono);letter-spacing:.12em;background:var(--red);color:#000;padding:5px 9px;
+  transform:translate(18px,-50%);opacity:0;transition:opacity .15s;white-space:nowrap}
+#tip.on{opacity:1}
+
+/* ---------- PREVIEW VIDEO ---------- */
+#preview{background:var(--red);color:#000;padding:90px 22px 100px;position:relative;overflow:hidden}
+.pv-head{display:flex;justify-content:space-between;align-items:flex-end;max-width:1200px;margin:0 auto 22px;gap:20px;flex-wrap:wrap}
+.pv-head .big{font-size:clamp(60px,11vw,170px)}
+.tv{position:relative;max-width:min(1200px,128vh);margin:0 auto;background:#000;border:8px solid #000;box-shadow:0 30px 70px rgba(0,0,0,.45)}
+.tv video{width:100%;display:block;aspect-ratio:16/9;background:#000}
+.tv .tvpg{position:absolute;top:14px;left:14px;z-index:3}
+.tv .vhs{position:absolute;top:16px;right:18px;z-index:3;font:600 14px var(--mono);color:#fff;letter-spacing:.1em;text-shadow:0 0 6px rgba(255,255,255,.6)}
+.tv .vhs i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:8px;animation:blink 1s steps(2) infinite}
+.tv .play{position:absolute;inset:0;z-index:4;display:grid;place-items:center;background:none;border:0;color:#fff}
+.tv .play .ret{width:120px;height:120px;transition:transform .3s}
+.tv .play:hover .ret{transform:scale(1.12) rotate(45deg)}
+.tv .play .lbl{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);font:600 12px var(--mono);letter-spacing:.2em;background:#000;padding:6px 10px}
+.tv.playing .play{opacity:0}
+.tv.playing:hover .play{opacity:1}
+.tv .tracking{position:absolute;left:0;right:0;height:14%;top:-20%;z-index:2;pointer-events:none;
+  background:linear-gradient(transparent,rgba(255,255,255,.08) 40%,rgba(255,255,255,.14) 50%,rgba(255,255,255,.08) 60%,transparent);animation:track 6s linear infinite;mix-blend-mode:screen}
+@keyframes track{0%{top:-20%}60%,100%{top:110%}}
+.vbar{height:4px;background:rgba(255,255,255,.15);position:absolute;left:0;right:0;bottom:0;z-index:5}
+.vbar i{display:block;height:100%;width:0;background:var(--red)}
+
+/* ---------- WARNING / JURISDICTION ---------- */
+#warning{background:#fff;color:#000;padding:110px 22px;position:relative;overflow:hidden}
+.w-grid{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:1.25fr 1fr;gap:60px;align-items:center}
+.w-card{position:relative;perspective:1400px}
+.w-card .inner{transition:transform .7s cubic-bezier(.3,1.4,.4,1);transform-style:preserve-3d;will-change:transform}
+.w-card:hover .inner{transform:scaleX(-1) !important}
+.w-card .sticker{position:absolute;right:-4%;bottom:-6%;width:44%;transform:scale(3) rotate(-25deg);opacity:0;filter:drop-shadow(0 6px 10px rgba(0,0,0,.3))}
+.w-card.in .sticker{animation:stamp .5s cubic-bezier(.3,1.6,.5,1) .5s forwards}
+@keyframes stamp{to{transform:scale(1) rotate(-7deg);opacity:1}}
+.w-card .hint{position:absolute;top:-28px;left:0;color:#777}
+.juris{text-align:center}
+.juris img{width:min(360px,80%);margin:0 auto;opacity:0;transform:scale(.85) rotate(-20deg);transition:all 1.2s cubic-bezier(.2,1,.3,1)}
+.juris.in img{opacity:1;transform:none}
+.juris .label{margin-bottom:16px}
+.typer{font-family:var(--mono);font-size:13px;letter-spacing:.06em;line-height:1.7;margin-top:22px;min-height:5em;text-align:left;max-width:420px;margin-inline:auto}
+.typer::after{content:"█";animation:blink .8s steps(2) infinite;color:var(--red)}
+
+/* ---------- LISTEN ---------- */
+#listen{background:#000;padding:110px 22px 120px;text-align:center;position:relative;overflow:hidden}
+#listen .big{font-size:clamp(70px,14vw,220px)}
+#listen .big .r{color:var(--red)}
+.platforms{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;margin:46px auto 0;max-width:900px}
+.plat{position:relative;font-weight:800;font-size:18px;letter-spacing:-.01em;padding:18px 30px;border:2px solid #2a2a2a;transition:color .2s,border-color .2s}
+.plat::before,.plat::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--red);transition:all .25s cubic-bezier(.2,1.4,.4,1);opacity:0}
+.plat::before{left:-14px;top:-14px;border-right:0;border-bottom:0}
+.plat::after{right:-14px;bottom:-14px;border-left:0;border-top:0}
+.plat:hover{color:var(--red);border-color:#000}
+.plat.soon{color:#555}
+.plat.soon::after{content:"SOON";opacity:1;position:static;display:block;width:auto;height:auto;border:0;font:600 10px var(--mono);letter-spacing:.2em;color:var(--red);margin-top:4px}
+.plat.soon:hover::after{right:auto;bottom:auto}
+.plat:hover::before{left:-6px;top:-6px;opacity:1}
+.plat:hover::after{right:-6px;bottom:-6px;opacity:1}
+.signup{margin:70px auto 0;max-width:620px}
+.signup form{display:flex;border:2px solid #fff;margin-top:14px}
+.signup input{flex:1;background:none;border:0;color:#fff;font:600 16px var(--mono);padding:16px 18px;outline:none;min-width:0}
+.signup input::placeholder{color:#666}
+.signup button{background:var(--red);color:#000;border:0;font:900 16px var(--sans);letter-spacing:-.01em;padding:0 26px}
+.signup button:hover{background:#fff}
+.signup .msg{font-family:var(--mono);font-size:12px;letter-spacing:.12em;margin-top:12px;color:var(--red);min-height:1.4em}
+
+/* ---------- CREDITS ---------- */
+#credits{background:var(--paper);color:#000;padding:100px 22px 40px}
+.c-wrap{max-width:1200px;margin:0 auto}
+.c-wrap .big{font-size:clamp(56px,9vw,140px)}
+.c-lines{margin-top:30px;font-weight:700;font-size:clamp(17px,2vw,24px);letter-spacing:-.02em;line-height:1.3}
+.c-lines p{opacity:0;transform:translateY(16px);transition:all .6s cubic-bezier(.2,.9,.2,1)}
+.c-lines.in p{opacity:1;transform:none}
+.c-lines.in p:nth-child(2){transition-delay:.08s}.c-lines.in p:nth-child(3){transition-delay:.16s}.c-lines.in p:nth-child(4){transition-delay:.24s}.c-lines.in p:nth-child(5){transition-delay:.32s}
+.logos{display:flex;flex-wrap:wrap;gap:46px;align-items:center;margin-top:70px;padding-top:40px;border-top:2px solid #000}
+.logos img{height:64px;width:auto;filter:invert(1);transition:transform .2s}
+.logos img.keep{filter:none}
+.logos img:hover{animation:glitch .3s steps(2) infinite}
+@keyframes glitch{0%{transform:translate(0)}25%{transform:translate(-3px,1px) skewX(-6deg)}50%{transform:translate(2px,-1px)}75%{transform:translate(3px,2px) skewX(5deg)}}
+.legal{margin-top:60px;font-size:10px;font-weight:700;text-align:center;letter-spacing:.02em}
+
+/* ---------- reveal scramble ---------- */
+[data-scramble]{white-space:nowrap}
+
+@media (max-width:900px){
+  nav{gap:14px;font-size:12px}
+  #tracklist .stage{grid-template-columns:1fr;grid-template-rows:auto 1fr auto;justify-items:center}
+  #tracklist .side{padding:14px 18px;align-items:center !important;text-align:center !important;flex-direction:row;gap:14px;justify-content:center;align-self:auto}
+  .tl-list,.tl-count{display:none}
+  #sheet{height:min(70vh,calc(92vw*1370/945))}
+  .w-grid{grid-template-columns:1fr}
+}
+@media (max-width:560px){ nav{display:none} }
+@media (prefers-reduced-motion:reduce){
+  .grain,.hero-marquee .row,.ticker .track,.tv .tracking{animation:none}
+}
+</style>
+</head>
+<body class="locked">
+<div class="grain"></div>
+<div id="progress"></div>
+<div id="holes"></div>
+<div id="tip"></div>
+<div id="reticle"><svg viewBox="-22 -22 44 44"><circle r="15" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M-22 0h12M10 0h12M0-22v12M0 10v12" stroke="currentColor" stroke-width="1.6"/><circle r="2" fill="currentColor"/></svg></div>
+
+<!-- ================= LOADER ================= -->
+<div id="loader">
+  <img class="skull-dim" id="skullDim" src="assets/skull.png" alt="">
+  <div id="lens">
+    <img id="skullZoom" src="assets/skull.png" alt="">
+    <div class="lens-tint"></div>
+    <svg viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid meet">
+      <circle r="97" fill="none" class="rline" stroke-width="1"/>
+      <path class="rline" d="M-100 0H-14M14 0H100M0-100V-14M0 14V100"/>
+      <path class="rline" stroke-width="4" d="M-100 0H-60M60 0H100M0-100V-60M0 60V100"/>
+      <g class="rline">
+        <path d="M-40 -3v6M-30 -3v6M-20 -3v6M20 -3v6M30 -3v6M40 -3v6M-3 -40h6M-3 -30h6M-3 -20h6M-3 20h6M-3 30h6M-3 40h6"/>
+      </g>
+      <circle r="2.4" class="rdot" fill="#ff1010"/>
+    </svg>
+  </div>
+  <div class="hud" id="hud-tl">SGM, LLC. <b>-PG14.</b><br>SCARYSOUNDS DIVISION<br><span id="wind">WIND 0.0 MPH</span></div>
+  <div class="hud" id="hud-tr">BUCKSHOT<b>®</b><br><span id="rng">RNG 412 YDS</span><br><span id="zoomtxt">ZOOM 4.0×</span></div>
+  <div class="hud" id="hud-b"><div id="pct">000%</div><div id="status">ACQUIRING TARGET</div><div class="bar"><i id="barfill"></i></div></div>
+  <button id="skip" type="button">SKIP ›</button>
+  <div id="whiteflash"></div>
+</div>
+<div id="rip">
+  <div class="half" id="ripTop"></div>
+  <div class="half" id="ripBot"></div>
+</div>
+
+<!-- ================= HERO ================= -->
+<section id="hero">
+  <div class="topbar">
+    <div class="tvpg"><small>TV</small>PG<span>14</span></div>
+    <nav><a href="#tracklist">TRACKLIST</a><a href="#preview">PREVIEW</a><a href="#listen">LISTEN</a><a href="#credits">CREDITS</a></nav>
+  </div>
+  <div class="hero-stage">
+    <div class="hero-marquee" aria-hidden="true">
+      <div class="row">BUCKSHOT® BUCKSHOT® BUCKSHOT® BUCKSHOT® </div>
+      <div class="row ghost">CASTRO PG14® CASTRO PG14® CASTRO PG14® CASTRO PG14® </div>
+    </div>
+    <div class="cover-wrap">
+      <svg class="targets" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <ellipse cx="50" cy="50" rx="49" ry="49"/><ellipse cx="50" cy="50" rx="44" ry="46" style="animation-delay:.15s"/><ellipse cx="50" cy="50" rx="39.5" ry="43" style="animation-delay:.3s"/>
+      </svg>
+      <div class="cover" id="cover"><img src="assets/cover.jpg" alt="BUCKSHOT® album cover — Castro PG14"><div class="glare"></div></div>
+    </div>
+  </div>
+  <div class="hero-foot">
+    <div class="date">
+      <div class="d1 rise" data-rise>SATURDAY®</div>
+      <div class="d2 rise" data-rise>NOV.21st</div>
+    </div>
+    <div class="countdown" id="countdown">CASTRO PG14 — BUCKSHOT®<br><b id="cd">—</b></div>
+  </div>
+  <div class="copy">©SGM.LLC. SCARYSOUNDS DIVISION. 2026. ALL RIGHTS RESERVED.</div>
+</section>
+
+<div class="ticker" aria-hidden="true"><div class="track" id="tickerTrack">
+  <span class="t r">BUCKSHOT®</span><span class="pill">STRONG LANGUAGE</span><span class="t">CASTRO PG14®</span>
+  <svg class="x" viewBox="-10 -10 20 20"><circle r="6" fill="#ff1010"/><path d="M-10 0h20M0-10v20" stroke="#ff1010" stroke-width="2"/></svg>
+  <span class="t">SCARYGEN.</span><span class="pill">LOOPHOLE</span><span class="t r">NOV.21st</span>
+  <svg class="x" viewBox="-10 -10 20 20"><circle r="6" fill="#ff1010"/><path d="M-10 0h20M0-10v20" stroke="#ff1010" stroke-width="2"/></svg>
+</div></div>
+
+<!-- ================= TRACKLIST ================= -->
+<section id="tracklist">
+  <div class="stage">
+    <div class="side">
+      <div class="label"><span class="n">02</span> / <span data-scramble>THE PIECES</span></div>
+      <div class="tl-head"><div class="a">BUCKSHOT®</div><div class="b">TRACKLIST</div></div>
+      <ul class="tl-list" id="tlList"></ul>
+    </div>
+    <div id="sheet"><div class="layer paper" id="paperLayer"></div><div class="layer ink" id="inkLayer"></div></div>
+    <div class="side r">
+      <div class="tl-count" id="tlCount">0<small>/8</small></div>
+      <div class="hint" id="tlHint">SCROLL TO PIECE IT TOGETHER <i>↓</i></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PREVIEW ================= -->
+<section id="preview">
+  <div class="pv-head">
+    <div><div class="label"><span class="n">03</span> / <span data-scramble>PREVIEW</span></div><div class="big">ON TAPE.</div></div>
+    <div class="label" style="text-align:right">©SGM.LLC.<br>SCARYSOUNDS DIVISION. 2026.</div>
+  </div>
+  <div class="tv scanlines" id="tv">
+    <video id="vid" src="assets/preview.mp4" poster="assets/poster.jpg" playsinline muted loop preload="metadata"></video>
+    <div class="tracking"></div>
+    <div class="vhs"><i></i>PLAY ▸ <span id="tc">00:00:00</span></div>
+    <button class="play" id="playBtn" type="button" aria-label="Play preview with sound">
+      <svg class="ret" viewBox="-60 -60 120 120"><circle r="44" fill="none" stroke="#fff" stroke-width="3"/><path d="M-60 0h34M26 0h34M0-60v34M0 26v34" stroke="#fff" stroke-width="3"/><path d="M-9-13 15 0-9 13z" fill="#ff1010"/></svg>
+      <span class="lbl" id="playLbl">TAP FOR SOUND</span>
+    </button>
+    <div class="vbar"><i id="vbar"></i></div>
+  </div>
+</section>
+
+<!-- ================= WARNING ================= -->
+<section id="warning">
+  <div class="w-grid">
+    <div class="w-card" id="wcard">
+      <div class="hint">HOVER TO READ THE FINE PRINT</div>
+      <div class="inner" id="winner"><img src="assets/warning.png" alt="SGI warning label (mirrored)"></div>
+      <img class="sticker" src="assets/strong.png" alt="Strong Language">
+    </div>
+    <div class="juris" id="juris">
+      <div class="label"><span class="n">04</span> / <span data-scramble>JURISDICTION</span></div>
+      <img src="assets/iatse.png" alt="This album made under the jurisdiction of Scary — affiliated with SGM, LLC. -PG14." style="filter:invert(1)">
+      <div class="typer" id="typer" data-text="THIS ALBUM MADE UNDER THE JURISDICTION OF SCARYGEN. AFFILIATED WITH SGM, LLC. -PG14. UNAUTHORIZED LISTENING IS ENCOURAGED."></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LISTEN ================= -->
+<section id="listen">
+  <div class="label"><span class="n">05</span> / <span data-scramble>LOAD UP</span></div>
+  <div class="big" style="margin-top:14px">LISTEN<span class="r">.</span></div>
+  <!-- TODO: replace # with the real streaming links -->
+  <div class="platforms">
+    <!-- When the album drops: swap each <span class="plat soon"> for <a class="plat" href="REAL_LINK">NAME</a> -->
+    <span class="plat soon">SPOTIFY</span><span class="plat soon">APPLE MUSIC</span><span class="plat soon">YOUTUBE</span><span class="plat soon">SOUNDCLOUD</span>
+  </div>
+  <div class="signup" hidden>
+    <div class="label">GET ON THE LIST — DROPS, MERCH, SHOWS</div>
+    <form id="signup"><input type="email" required placeholder="YOUR@EMAIL.COM" aria-label="Email address"><button type="submit">LOCK IN</button></form>
+    <div class="msg" id="smsg"></div>
+  </div>
+</section>
+
+<!-- ================= CREDITS ================= -->
+<section id="credits">
+  <div class="c-wrap">
+    <div class="label"><span class="n">06</span> / <span data-scramble>CREDITS</span></div>
+    <div class="big" style="margin-top:12px">CASTRO PG14®</div>
+    <div class="c-lines" id="clines">
+      <p>Recorded, Performed, and Produced by Castro PG14.</p>
+      <p>Additional Production by Constantine Kontos.</p>
+      <p>Engineered by Jake Vicious.</p>
+      <p>Distributed by SCARYGENERATIONS MEDIA, LLC.</p>
+      <p>in association with Playground Fourteen.</p>
+    </div>
+    <div class="logos">
+      <img src="assets/castro.png" alt="Castro PG14">
+      <img src="assets/loophole.png" alt="Loophole">
+      <img src="assets/scarygen.png" alt="Scarygen">
+      <img src="assets/loophole_gold.png" alt="Loophole mark" style="height:90px">
+    </div>
+    <div class="legal">©SGM.LLC. SCARYSOUNDS DIVISION. 2026. ALL RIGHTS RESERVED.</div>
+  </div>
+</section>
+
+<script>
+(()=>{
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FINE = matchMedia('(pointer:fine)').matches;
+const $ = s=>document.querySelector(s);
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const easeOut=t=>1-Math.pow(1-t,3);
+// Set the real release date here when it's announced, e.g. new Date('2026-12-05T00:00:00-05:00'). null = COMING SOON.
+const RELEASE = null;
+
+/* ============ LOADER: scope locks onto the buck's eye ============ */
+const EYE={x:.525,y:.817};            // eye position inside skull.png (fraction)
+const SK_AR=1188/1493;
+const loader=$('#loader'), lens=$('#lens'), dim=$('#skullDim'), zoom=$('#skullZoom');
+let sk={}, lensD=0, Z=2.6, lx=0, ly=0, prog=0, t0=performance.now(), finished=false, firing=false;
+const MIN_MS = RM?600:4200;
+
+function layoutSkull(){
+  const vw=innerWidth, vh=innerHeight;
+  const h=Math.min(vh*.84, vw*.9/SK_AR), w=h*SK_AR;
+  sk={w,h,x:vw/2-w*EYE.x,y:Math.min(vh*.48-h*EYE.y,(vh-h)/2)};
+  Object.assign(dim.style,{width:w+'px',height:h+'px',left:sk.x+'px',top:sk.y+'px'});
+  lensD=Math.min(vw,vh)*.46;
+  Object.assign(lens.style,{width:lensD+'px',height:lensD+'px'});
+  Object.assign(zoom.style,{width:w*Z+'px',height:h*Z+'px'});
+}
+layoutSkull(); addEventListener('resize',layoutSkull);
+lx=innerWidth*.2; ly=innerHeight*.3;
+
+// real asset loading drives the % (with a minimum show time)
+const assetList=['assets/cover.jpg','assets/skull.png','assets/head.png','assets/t1.png','assets/t2.png','assets/t3.png','assets/t5.png','assets/t6.png','assets/t7.png','assets/n4.png','assets/warning.png','assets/iatse.png'];
+let loaded=0;
+assetList.forEach(src=>{const i=new Image();i.onload=i.onerror=()=>loaded++;i.src=src;});
+
+function loaderFrame(now){
+  if(finished) return;
+  const tt=(now-t0)/1000;
+  const timeP=clamp((now-t0)/MIN_MS), loadP=loaded/assetList.length;
+  const target=Math.min(timeP,loadP*0.999+(loadP===1?.001:0));
+  prog += (target-prog)*.08; if(target>=1 && prog>.995) prog=1;
+  const ex=sk.x+sk.w*EYE.x, ey=sk.y+sk.h*EYE.y;
+  const A=Math.pow(1-prog,1.25)*Math.min(innerWidth,innerHeight)*.42;
+  const tx=ex+A*(Math.sin(tt*.9)+.5*Math.sin(tt*2.3+1)), ty=ey+A*(Math.cos(tt*.7)*.8+.4*Math.sin(tt*1.9));
+  const breath=(1-prog*.85)*3;
+  lx+=(tx-lx)*.06; ly+=(ty-ly)*.06;
+  const jx=lx+Math.sin(tt*11)*breath, jy=ly+Math.cos(tt*13)*breath;
+  lens.style.left=(jx-lensD/2)+'px'; lens.style.top=(jy-lensD/2)+'px';
+  zoom.style.left=(lensD/2-(jx-sk.x)*Z)+'px'; zoom.style.top=(lensD/2-(jy-sk.y)*Z)+'px';
+  const pc=Math.round(prog*100);
+  $('#pct').textContent=String(pc).padStart(3,'0')+'%';
+  $('#barfill').style.width=pc+'%';
+  $('#rng').textContent='RNG '+String(Math.round(412-prog*300)).padStart(3,'0')+' YDS';
+  $('#wind').textContent='WIND '+(Math.abs(Math.sin(tt*.6))*7).toFixed(1)+' MPH';
+  $('#zoomtxt').textContent='ZOOM '+(4+prog*6).toFixed(1)+'×';
+  if(prog>=1 && !firing){ firing=true; lockAndFire(); }
+  requestAnimationFrame(loaderFrame);
+}
+requestAnimationFrame(loaderFrame);
+
+function lockAndFire(){
+  lens.classList.add('locked');
+  const st=$('#status'); st.textContent='TARGET LOCKED'; st.classList.add('lockedtxt');
+  setTimeout(fire, RM?100:750);
+}
+function fire(){
+  finished=true;
+  const ex=sk.x+sk.w*EYE.x, ey=sk.y+sk.h*EYE.y;
+  // build the two torn halves of a still frame
+  const vw=innerWidth, vh=innerHeight;
+  const pts=[]; for(let x=0;x<=vw+20;x+=vw/28){pts.push([x, ey+(Math.random()-.5)*46 + (x-ex)*.04]);}
+  const toPct=p=>`${(p[0]/vw*100).toFixed(2)}% ${(p[1]/vh*100).toFixed(2)}%`;
+  const topPoly='polygon(0 0,100% 0,'+pts.slice().reverse().map(toPct).join(',')+')';
+  const botPoly='polygon('+pts.map(toPct).join(',')+',100% 100%,0 100%)';
+  const crack=()=>{let s='';for(let i=0;i<9;i++){const a=i/9*Math.PI*2+Math.random()*.4;let x=ex,y=ey,d=`M${x} ${y}`;for(let k=0;k<4;k++){x+=Math.cos(a+(Math.random()-.5)*.6)*(40+Math.random()*90);y+=Math.sin(a+(Math.random()-.5)*.6)*(40+Math.random()*90);d+=` L${x.toFixed(1)} ${y.toFixed(1)}`;}s+=`<path d="${d}" fill="none" stroke="#fff" stroke-width="1.4" opacity=".85"/>`;}return s;};
+  const cracks=crack();
+  ['ripTop','ripBot'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    el.innerHTML=`<img src="assets/skull.png" style="width:${sk.w}px;height:${sk.h}px;left:${sk.x}px;top:${sk.y}px"><div class="hole" style="left:${ex}px;top:${ey}px"></div><svg viewBox="0 0 ${vw} ${vh}">${cracks}</svg>`;
+    el.style.clipPath=i?botPoly:topPoly;
+  });
+  const wf=$('#whiteflash');
+  wf.style.transition='none'; wf.style.opacity=1;
+  document.body.classList.add('shake');
+  setTimeout(()=>{
+    $('#rip').style.display='block';
+    loader.style.display='none';
+    document.body.classList.remove('locked','shake');
+    startHero();
+    // rip the frame apart
+    const top=$('#ripTop'), bot=$('#ripBot');
+    const dur=RM?200:1100;
+    top.animate([{transform:'none'},{transform:'translateY(-62vh) rotate(-4deg)'}],{duration:dur,delay:RM?0:380,easing:'cubic-bezier(.7,0,.25,1)',fill:'forwards'});
+    const a=bot.animate([{transform:'none'},{transform:'translateY(62vh) rotate(3deg)'}],{duration:dur,delay:RM?0:380,easing:'cubic-bezier(.7,0,.25,1)',fill:'forwards'});
+    a.onfinish=()=>{$('#rip').remove()};
+  },90);
+}
+$('#skip').addEventListener('click',e=>{e.stopPropagation(); if(!firing){firing=true; prog=1; loaded=assetList.length; fire();}});
+
+/* ============ HERO ============ */
+document.querySelectorAll('[data-rise]').forEach(el=>{
+  const txt=el.textContent; el.textContent='';
+  [...txt].forEach((c,i)=>{const s=document.createElement('span');s.textContent=c;s.style.setProperty('--i',i);el.appendChild(s);});
+});
+function startHero(){ $('#hero').classList.add('hero-in'); if(FINE) document.body.classList.add('cursor-on'); }
+const cover=$('#cover');
+$('#hero').addEventListener('mousemove',e=>{
+  const r=cover.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width-.5, y=(e.clientY-r.top)/r.height-.5;
+  cover.style.transform=`rotateY(${x*14}deg) rotateX(${-y*14}deg)`;
+  cover.style.setProperty('--gx',(x+.5)*100+'%'); cover.style.setProperty('--gy',(y+.5)*100+'%');
+});
+$('#hero').addEventListener('mouseleave',()=>cover.style.transform='');
+function tick(){
+  const el=$('#cd'); if(!RELEASE){ el.textContent='COMING SOON'; el.classList.add('live'); return; }
+  const d=RELEASE-new Date();
+  if(d<=0){ el.textContent='OUT NOW'; el.classList.add('live'); return; }
+  const s=Math.floor(d/1000), D=Math.floor(s/86400), H=Math.floor(s%86400/3600), M=Math.floor(s%3600/60), S=s%60;
+  el.textContent=`DROPS IN ${String(D).padStart(2,'0')}D ${[H,M,S].map(n=>String(n).padStart(2,'0')).join(':')}`;
+  setTimeout(tick,1000);
+}
+tick();
+// duplicate ticker for seamless loop
+const tk=$('#tickerTrack'); tk.innerHTML+=tk.innerHTML;
+
+/* ============ CURSOR + BUCKSHOT CLICKS ============ */
+const ret=$('#reticle'); let mx=-100,my=-100,rx=-100,ry=-100;
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;checkBg();});
+addEventListener('scroll',()=>checkBg(),{passive:true});
+/* Reticle colour follows what's under it:
+   red sections → black, but white over black lettering/boxes;
+   everywhere else → red, but white over red lettering. */
+const TEXT_SEL='nav a,.date div,.countdown,.copy,.hero-marquee .row,.pv-head .big,.pv-head .label,.ticker .t,.ticker .pill,.tl-head div,.tl-count,.big,.label,.c-lines p,.plat,.legal,.hint,.signup button';
+const BOX_SEL='.tvpg,.countdown b,.signup button';
+const rgb=c=>{const m=c.match(/[\d.]+/g)||[0,0,0,0];return {r:+m[0],g:+m[1],b:+m[2],a:m[3]===undefined?1:+m[3]};};
+const kind=c=>{ if(c.a<.2) return null; if(c.r>170&&c.g<90&&c.b<90) return 'red'; const L=.3*c.r+.59*c.g+.11*c.b; return L<70?'dark':'light'; };
+const inR=(r,x,y)=>x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom;
+const range=document.createRange();
+function glyphUnder(x,y){
+  let hit=null;
+  for(const el of document.querySelectorAll(TEXT_SEL)){
+    if(!inR(el.getBoundingClientRect(),x,y)) continue;
+    const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+    for(let n=w.nextNode();n;n=w.nextNode()){
+      const t=n.textContent;
+      for(let i=0;i<t.length;i++){
+        if(t[i]===' ') continue;
+        range.setStart(n,i); range.setEnd(n,i+1);
+        if(inR(range.getBoundingClientRect(),x,y)){ const k=kind(rgb(getComputedStyle(n.parentElement).color)); if(k) hit=k; break; }
+      }
+    }
+  }
+  for(const el of document.querySelectorAll(BOX_SEL)){
+    if(inR(el.getBoundingClientRect(),x,y)){ const k=kind(rgb(getComputedStyle(el).backgroundColor)); if(k && !hit) hit=k; }
+  }
+  return hit;
+}
+function checkBg(){
+  if(!document.body.classList.contains('cursor-on')) return;
+  const el=document.elementFromPoint(mx,my); if(!el) return;
+  const redZone=!!el.closest('#hero,#preview') && !el.closest('#tv');
+  const g=glyphUnder(mx,my);
+  const c = redZone ? (g==='dark'?'c-white':'c-black') : (g==='red'?'c-white':'');
+  ret.classList.remove('c-black','c-white'); if(c) ret.classList.add(c);
+}
+// re-check a few times a second so the moving marquee letters are caught even if the mouse is still
+setInterval(checkBg,120);
+(function cur(){rx+=(mx-rx)*.35;ry+=(my-ry)*.35;ret.style.transform=`translate(${rx}px,${ry}px)`;requestAnimationFrame(cur);})();
+document.addEventListener('mouseover',e=>{ret.classList.toggle('lock',!!e.target.closest('a,button,input,.ink .pc,.w-card'));});
+const holes=$('#holes');
+document.addEventListener('click',e=>{
+  if(!document.body.classList.contains('cursor-on')&&FINE) return;
+  if(e.target.closest('a,button,input,video,#tv')) return;
+  const X=e.pageX, Y=e.pageY;
+  const ring=document.createElement('div'); ring.className='flash-ring'; ring.style.left=X+'px'; ring.style.top=Y+'px'; holes.appendChild(ring); setTimeout(()=>ring.remove(),500);
+  const n=7+Math.floor(Math.random()*4);
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, r=Math.sqrt(Math.random())*34;
+    const p=document.createElement('div'); p.className='pellet';
+    p.style.left=(X+Math.cos(a)*r)+'px'; p.style.top=(Y+Math.sin(a)*r)+'px';
+    p.style.setProperty('--s',(7+Math.random()*6)+'px'); p.style.animationDelay=(Math.random()*40)+'ms';
+    holes.appendChild(p); setTimeout(()=>p.remove(),7200);
+  }
+  while(holes.children.length>120) holes.firstChild.remove();
+  if(!RM){ document.body.classList.remove('shake'); void document.body.offsetWidth; document.body.classList.add('shake'); }
+});
+
+/* ============ TRACKLIST: torn scraps that rip back together ============ */
+const OX=790, OY=95, SW=945, SH=1370, PAD=16;
+const pieces=[
+  {label:'BUCKSHOT® — TRACKLIST', x:872,y:107,w:663,h:274, imgs:[['head',0,0,663,274]]},
+  {label:'I. PREFACE',             x:901,y:396,w:452,h:143, imgs:[['t1',0,0,452,143]]},
+  {label:'II. PROPHET & PROFITS',  x:887,y:504,w:835,h:170, imgs:[['t2',0,0,835,170]]},
+  {label:'III. TUMMY ACHE',        x:863,y:652,w:845,h:312, imgs:[['t3',0,0,845,312]]},
+  {label:'IV. BUCKSHOT',           x:822,y:930,w:362,h:100, imgs:[['n4',0,10,117,86],['head',130,0,232,96]]},
+  {label:'V. VANITY',              x:811,y:1061,w:878,h:171, imgs:[['t5',0,0,878,171]]},
+  {label:'VI. INFINITE LOVE',      x:803,y:1171,w:305,h:224, imgs:[['t6',0,0,305,224]]},
+  {label:'VII. HUMBLE BEGINNINGS', x:1192,y:1207,w:511,h:245, imgs:[['t7',0,0,511,245]]},
+];
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const paperLayer=$('#paperLayer'), inkLayer=$('#inkLayer'), tlList=$('#tlList');
+pieces.forEach((p,i)=>{
+  const bx=p.x-PAD, by=p.y-PAD, bw=p.w+PAD*2, bh=p.h+PAD*2;
+  const box={left:((bx-OX)/SW*100)+'%',top:((by-OY)/SH*100)+'%',width:(bw/SW*100)+'%',height:(bh/SH*100)+'%'};
+  // jagged outline in piece units
+  const J=5, step=18;
+  const P=(x,y)=>`${(x/bw*100).toFixed(2)}% ${(y/bh*100).toFixed(2)}%`;
+  const tearX=bw*rnd(.36,.64);
+  const top=[],bot=[],tear=[];
+  for(let x=0;x<=bw;x+=step) top.push([Math.min(x,bw), rnd(0,J)]);
+  for(let x=0;x<=bw;x+=step) bot.push([Math.min(x,bw), bh-rnd(0,J)]);
+  for(let y=0;y<=bh;y+=10) tear.push([tearX+rnd(-9,9)+Math.sin(y*.05)*6, y]);
+  tear[0][1]=0; tear[tear.length-1][1]=bh;
+  const L=[[rnd(0,J),0], ...top.filter(q=>q[0]<tear[0][0]), ...tear, ...bot.filter(q=>q[0]<tear[tear.length-1][0]).reverse(), [rnd(0,J),bh]];
+  for(let y=bh;y>=0;y-=step) L.push([rnd(0,J),y]);
+  const R=[...top.filter(q=>q[0]>tear[0][0]), [bw-rnd(0,J),0]];
+  for(let y=0;y<=bh;y+=step) R.push([bw-rnd(0,J),y]);
+  R.push(...bot.filter(q=>q[0]>tear[tear.length-1][0]).reverse(), ...tear.slice().reverse());
+  const clipL='polygon('+L.map(q=>P(...q)).join(',')+')', clipR='polygon('+R.map(q=>P(...q)).join(',')+')';
+  p.halves=[]; p.rest=rnd(-1.6,1.6);
+  [clipL,clipR].forEach((clip,side)=>{
+    const pw=document.createElement('div'); pw.className='pc'; Object.assign(pw.style,box);
+    const pp=document.createElement('div'); pp.className='pp'; pp.style.clipPath=clip; pw.appendChild(pp); paperLayer.appendChild(pw);
+    const ink=document.createElement('div'); ink.className='pc'; Object.assign(ink.style,box); ink.style.clipPath=clip;
+    p.imgs.forEach(([src,ix,iy,iw,ih])=>{
+      const im=document.createElement('img'); im.src='assets/'+src+'.png'; im.alt=side?'':p.label;
+      Object.assign(im.style,{left:((ix+PAD)/bw*100)+'%',top:((iy+PAD)/bh*100)+'%',width:(iw/bw*100)+'%',height:(ih/bh*100)+'%'});
+      ink.appendChild(im);
+    });
+    inkLayer.appendChild(ink);
+    ink.addEventListener('mouseenter',()=>{tip.textContent=p.label;tip.classList.add('on');});
+    ink.addEventListener('mouseleave',()=>tip.classList.remove('on'));
+    ink.addEventListener('click',e=>{e.stopPropagation(); p.jolt=1;});
+    p.halves.push({paper:pw, ink, dir:side?1:-1, fx:rnd(.55,.95), fy:rnd(-.5,.5), fr:rnd(15,55)*(Math.random()<.5?-1:1)});
+  });
+  // tape over the tear
+  const tape=document.createElement('div'); tape.className='tape';
+  tape.style.left=(box.left.slice(0,-1)*1 + (tearX/bw)*(bw/SW*100))+'%';
+  tape.style.top=(box.top.slice(0,-1)*1 + (PAD*.4/SH*100))+'%';
+  tape.style.setProperty('--tr',rnd(-12,12)+'deg');
+  inkLayer.appendChild(tape); p.tape=tape; p.jolt=0; p.joined=false;
+  const li=document.createElement('li'); li.textContent=p.label; tlList.appendChild(li); p.li=li;
+});
+const tip=$('#tip');
+addEventListener('mousemove',e=>{tip.style.left=e.clientX+'px';tip.style.top=e.clientY+'px';});
+const tl=$('#tracklist'), tlCount=$('#tlCount');
+function trackFrame(){
+  const r=tl.getBoundingClientRect(), vw=innerWidth, vh=innerHeight;
+  const p= RM?1:clamp(-r.top/(r.height-vh));
+  let done=0;
+  pieces.forEach((pc,i)=>{
+    const s=.02+i*.085, t=clamp((p-s)/.3), e=easeOut(t), k=1-e;
+    pc.jolt*=.9;
+    pc.halves.forEach(h=>{
+      const dx=h.dir*(k*vw*h.fx + pc.jolt*22), dy=k*vh*h.fy, rot=h.dir*(k*h.fr + pc.jolt*5)+pc.rest;
+      const tr=`translate(${dx.toFixed(1)}px,${dy.toFixed(1)}px) rotate(${rot.toFixed(2)}deg)`;
+      h.paper.style.transform=tr; h.ink.style.transform=tr;
+    });
+    pc.tape.style.marginLeft='0';
+    const j=t>=1;
+    if(j!==pc.joined){pc.joined=j; pc.tape.style.transform=j?`translate(-50%,-50%) rotate(${pc.tape.style.getPropertyValue('--tr')}) scale(1)`:''; pc.li.classList.toggle('on',j);}
+    if(j) done++;
+  });
+  tlCount.innerHTML=done+'<small>/8</small>';
+  $('#tlHint').innerHTML = done===8 ? 'CLICK A SCRAP TO RE-TEAR IT' : 'SCROLL TO PIECE IT TOGETHER <i>↓</i>';
+  // page progress bar
+  const max=document.documentElement.scrollHeight-vh; $('#progress').style.width=(scrollY/max*100)+'%';
+  requestAnimationFrame(trackFrame);
+}
+requestAnimationFrame(trackFrame);
+
+/* ============ VIDEO ============ */
+const vid=$('#vid'), tv=$('#tv');
+new IntersectionObserver(es=>es.forEach(en=>{ if(en.isIntersecting){vid.play().catch(()=>{});} else vid.pause(); }),{threshold:.35}).observe(tv);
+$('#playBtn').addEventListener('click',()=>{
+  if(vid.muted){ vid.muted=false; vid.currentTime=0; vid.play().catch(()=>{}); tv.classList.add('playing'); $('#playLbl').textContent='SOUND ON — TAP TO MUTE'; }
+  else { vid.muted=true; $('#playLbl').textContent='TAP FOR SOUND'; tv.classList.remove('playing'); }
+});
+vid.addEventListener('timeupdate',()=>{
+  const t=vid.currentTime; $('#vbar').style.width=(t/(vid.duration||1)*100)+'%';
+  const f=Math.floor((t%1)*30); $('#tc').textContent=`00:${String(Math.floor(t)).padStart(2,'0')}:${String(f).padStart(2,'0')}`;
+});
+
+/* ============ REVEALS: scramble, warning card, typer, credits ============ */
+const GL='█▓▒░#%&$@!?/\\<>*+=';
+function scramble(el){
+  const final=el.dataset.final||(el.dataset.final=el.textContent); let f=0;
+  const iv=setInterval(()=>{ el.textContent=[...final].map((c,i)=>c===' '?' ':(i<f/2?c:GL[Math.floor(Math.random()*GL.length)])).join(''); if(++f>final.length*2+2){clearInterval(iv);el.textContent=final;} },28);
+}
+function typer(el){
+  const txt=el.dataset.text; let i=0; el.textContent='';
+  const iv=setInterval(()=>{el.textContent=txt.slice(0,++i); if(i>=txt.length) clearInterval(iv);},RM?0:32);
+}
+const io=new IntersectionObserver(es=>es.forEach(en=>{
+  if(!en.isIntersecting) return; const el=en.target; io.unobserve(el);
+  if(el.dataset.scramble!==undefined) scramble(el);
+  if(el.id==='juris'){el.classList.add('in'); typer($('#typer'));}
+  if(el.id==='wcard'||el.id==='clines') el.classList.add('in');
+}),{threshold:.3});
+document.querySelectorAll('[data-scramble],#juris,#wcard,#clines').forEach(el=>io.observe(el));
+// warning card tilts flat as you scroll to it
+const winner=$('#winner');
+addEventListener('scroll',()=>{
+  const r=$('#wcard').getBoundingClientRect(), p=clamp(1-(r.top+r.height/2)/innerHeight*1.1+.35);
+  if(!winner.matches(':hover')) winner.style.transform=RM?'':`rotateX(${(1-p)*55}deg) rotateZ(${(1-p)*-8}deg) translateY(${(1-p)*60}px)`;
+},{passive:true});
+
+/* ============ SIGNUP (front-end only) ============ */
+$('#signup').addEventListener('submit',e=>{
+  e.preventDefault();
+  // TODO: send to your mailing-list provider (Mailchimp / Klaviyo / Laylo) here.
+  $('#smsg').textContent='PREVIEW BUILD — MAILING LIST NOT CONNECTED YET.';
+});
+})();
+</script>
+</body>
+</html>
